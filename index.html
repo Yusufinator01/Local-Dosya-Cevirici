@@ -1,0 +1,983 @@
+<!DOCTYPE html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Yerel Dosya Dönüştürücü - Convertio Benzeri</title>
+
+    <!-- CSS Stilleri -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Güvenlik ayarlarını en üstte ve en hızlı şekilde yükle -->
+    <script>
+      window.coi = {
+        shouldReload: () => true,
+        quiet: false
+      };
+    </script>
+    <script src="https://cdn.jsdelivr.net/gh/gzuidhof/coi-serviceworker@latest/coi-serviceworker.min.js"></script>
+    <style>
+      :root {
+        --primary: #3b82f6;
+        --primary-hover: #2563eb;
+        --bg: #0b0f1a;
+        --panel-bg: #131926;
+        --border: rgba(255, 255, 255, 0.08);
+        --text: #ffffff;
+        --text-muted: #94a3b8;
+        --success: #10b981;
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        background-color: var(--bg);
+        color: var(--text);
+        height: 100vh;
+        overflow: hidden;
+      }
+
+      .app-wrapper {
+        display: flex;
+        height: 100vh;
+        width: 100%;
+      }
+
+      /* Side Panel: Upload & Settings */
+      .side-panel {
+        width: 400px;
+        background: var(--panel-bg);
+        border-right: 1px solid var(--border);
+        display: flex;
+        flex-direction: column;
+        padding: 30px;
+        flex-shrink: 0;
+      }
+
+      .logo-area {
+        margin-bottom: 30px;
+      }
+
+      .logo-area h1 {
+        font-size: 1.5rem;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        color: var(--primary);
+      }
+
+      .logo-area p {
+        font-size: 0.85rem;
+        color: var(--text-muted);
+      }
+
+      /* Main Content: File Lists */
+      .main-content {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        background: var(--bg);
+        overflow: hidden;
+      }
+
+      .top-bar {
+        height: 70px;
+        padding: 0 30px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .scroll-area {
+        flex: 1;
+        overflow-y: auto;
+        padding: 30px;
+        display: flex;
+        flex-direction: column;
+        gap: 30px;
+      }
+
+      /* Upload Area */
+      .upload-box {
+        border: 2px dashed var(--border);
+        border-radius: 16px;
+        padding: 40px 20px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        background: rgba(255, 255, 255, 0.02);
+        margin-bottom: 25px;
+      }
+
+      .upload-box:hover, .upload-box.dragover {
+        border-color: var(--primary);
+        background: rgba(59, 130, 246, 0.05);
+      }
+
+      .upload-icon {
+        font-size: 2.5rem;
+        margin-bottom: 12px;
+        display: block;
+      }
+
+      .upload-text {
+        font-size: 1.1rem;
+        font-weight: 700;
+        margin-bottom: 4px;
+      }
+
+      .upload-hint {
+        font-size: 0.85rem;
+        color: var(--text-muted);
+      }
+
+      /* Settings */
+      .settings-panel {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 20px;
+      }
+
+      .settings-title {
+        font-size: 0.85rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        color: var(--text-muted);
+        margin-bottom: 15px;
+        letter-spacing: 0.05em;
+      }
+
+      .setting-item {
+        margin-bottom: 15px;
+      }
+
+      .setting-item label {
+        display: block;
+        font-size: 0.8rem;
+        margin-bottom: 6px;
+        color: var(--text-muted);
+      }
+
+      .setting-input {
+        width: 100%;
+        background: #0f172a;
+        border: 1px solid var(--border);
+        color: #fff;
+        padding: 10px 12px;
+        border-radius: 10px;
+        font-size: 0.9rem;
+      }
+
+      /* File Cards */
+      .section-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 15px;
+      }
+
+      .section-title {
+        font-size: 1rem;
+        font-weight: 700;
+      }
+
+      .file-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 12px;
+      }
+
+      .file-card {
+        background: var(--panel-bg);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 12px 16px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .file-thumb {
+        width: 40px;
+        height: 40px;
+        background: rgba(255,255,255,0.05);
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.1rem;
+      }
+
+      .file-info {
+        flex: 1;
+        min-width: 0;
+      }
+
+      .file-name {
+        font-weight: 600;
+        font-size: 0.9rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .file-meta {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+      }
+
+      /* Buttons */
+      .btn {
+        padding: 8px 16px;
+        border-radius: 8px;
+        font-weight: 700;
+        cursor: pointer;
+        border: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.85rem;
+        transition: all 0.2s;
+      }
+
+      .btn-primary {
+        background: var(--primary);
+        color: white;
+      }
+
+      .btn-primary:hover {
+        background: var(--primary-hover);
+      }
+
+      .btn-danger {
+        background: rgba(244, 63, 94, 0.1);
+        color: #fb7185;
+      }
+
+      .btn-ghost {
+        background: transparent;
+        color: var(--text-muted);
+        border: 1px solid var(--border);
+      }
+
+      .btn-ghost:hover {
+        border-color: var(--text-muted);
+        color: #fff;
+      }
+
+      /* Format Select */
+      .select-format {
+        background: #1e293b;
+        color: #fff;
+        border: 1px solid var(--border);
+        padding: 6px 10px;
+        border-radius: 8px;
+        font-size: 0.8rem;
+      }
+
+      /* Progress & Error */
+      .process-overlay {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        background: var(--panel-bg);
+        border: 1px solid var(--primary);
+        border-radius: 12px;
+        padding: 15px;
+        width: 300px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        display: none;
+        z-index: 1000;
+      }
+
+      .progress-bar-bg {
+        height: 4px;
+        background: rgba(255,255,255,0.05);
+        border-radius: 4px;
+        margin: 8px 0;
+        overflow: hidden;
+      }
+
+      .progress-bar-fill {
+        height: 100%;
+        background: var(--primary);
+        width: 0%;
+        transition: width 0.3s;
+      }
+
+      .error-toast {
+        position: fixed;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: #f43f5e;
+        color: white;
+        padding: 10px 20px;
+        border-radius: 8px;
+        font-weight: 700;
+        display: none;
+        z-index: 2000;
+        box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+        font-size: 0.9rem;
+      }
+
+      /* Format Cards in Sidebar */
+      .format-cards {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .format-card {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 15px;
+        transition: all 0.2s ease;
+      }
+      .format-card:hover {
+        background: rgba(255, 255, 255, 0.05);
+        border-color: rgba(255, 255, 255, 0.15);
+      }
+      .format-card-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 8px;
+      }
+      .format-card-title {
+        font-size: 0.75rem;
+        font-weight: 800;
+        color: var(--primary);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+      .format-card-list {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        line-height: 1.5;
+        font-weight: 500;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="errorMessage" class="error-toast"></div>
+
+    <div class="app-wrapper">
+      <!-- Side Panel -->
+      <aside class="side-panel">
+        <div class="logo-area">
+          <h1>Dosya Dönüştürücü</h1>
+          <p>Hızlı, Güvenli, Tam Ekran</p>
+        </div>
+
+        <div id="uploadArea" class="upload-box">
+          <span class="upload-icon">📁</span>
+          <div class="upload-text">Dosyaları Yükle</div>
+          <div class="upload-hint">veya sürükle bırak</div>
+          <input type="file" id="fileInput" class="file-input" style="display:none" multiple />
+        </div>
+
+        <div id="imageSettings" class="settings-panel" style="display: none;">
+          <div class="settings-title">🖼️ Resim Ayarları</div>
+          <div class="setting-item">
+            <label>Kalite (1-100)</label>
+            <input type="number" id="imgQuality" class="setting-input" value="90" />
+          </div>
+          <div class="setting-item">
+            <label>Genişlik (px)</label>
+            <input type="number" id="imgWidth" class="setting-input" placeholder="Orijinal" />
+          </div>
+          <div class="setting-item">
+            <label>Yükseklik (px)</label>
+            <input type="number" id="imgHeight" class="setting-input" placeholder="Orijinal" />
+          </div>
+        </div>
+
+        <div style="margin-top: auto; padding-top: 20px;">
+          <div class="format-cards">
+            <div class="format-card">
+              <div class="format-card-header">
+                <span>🖼️</span>
+                <div class="format-card-title">Fotoğraflar</div>
+              </div>
+              <div class="format-card-list">
+                JPG, PNG, WEBP, GIF, BMP
+              </div>
+            </div>
+            
+            <div class="format-card">
+              <div class="format-card-header">
+                <span>📄</span>
+                <div class="format-card-title">Belgeler</div>
+              </div>
+              <div class="format-card-list">
+                PDF, TXT, HTML, MD, CSV, JSON
+              </div>
+            </div>
+
+            <div class="format-card">
+              <div class="format-card-header">
+                <span>🎬</span>
+                <div class="format-card-title">Videolar</div>
+              </div>
+              <div class="format-card-list">
+                MP4, WEBM, MOV, AVI, MKV
+              </div>
+            </div>
+
+            <div class="format-card">
+              <div class="format-card-header">
+                <span>🎵</span>
+                <div class="format-card-title">Ses Dosyaları</div>
+              </div>
+              <div class="format-card-list">
+                MP3, WAV, OGG, AAC, M4A
+              </div>
+            </div>
+          </div>
+          <p style="font-size: 0.65rem; color: var(--text-muted); margin-top: 15px; text-align: center;">
+            Tüm işlemler güvenli ve yerel olarak yapılır.
+          </p>
+          <p style="font-size: 0.7rem; color: var(--text-muted); margin-top: 10px; text-align: center; border-top: 1px solid var(--border); padding-top: 15px;">
+            Bu sayfa <a href="https://www.instagram.com/yusufosmanercelik/?hl=tr" target="_blank" style="color: var(--primary); text-decoration: none; font-weight: 700; border-bottom: 1px solid transparent; transition: all 0.2s;">Yusuf</a> tarafından yapılmıştır.
+          </p>
+        </div>
+      </aside>
+
+      <!-- Main Content -->
+      <main class="main-content">
+        <header class="top-bar">
+          <div style="display: flex; align-items: center; gap: 20px;">
+            <span style="font-size: 0.85rem; font-weight: 700; color: var(--text-muted);">TOPLU İŞLEM:</span>
+            <select id="globalTargetFormat" class="select-format">
+              <option value="">Hedef Format Seçin...</option>
+              <optgroup label="Resim">
+                <option value="png">PNG</option>
+                <option value="jpg">JPG</option>
+                <option value="webp">WEBP</option>
+              </optgroup>
+              <optgroup label="Döküman">
+                <option value="pdf">PDF</option>
+                <option value="txt">TXT</option>
+                <option value="md">Markdown</option>
+              </optgroup>
+              <optgroup label="Video">
+                <option value="mp4">MP4</option>
+                <option value="webm">WebM</option>
+                <option value="avi">AVI</option>
+              </optgroup>
+              <optgroup label="Ses">
+                <option value="mp3">MP3</option>
+                <option value="wav">WAV</option>
+                <option value="ogg">OGG</option>
+              </optgroup>
+            </select>
+          </div>
+          <div style="display: flex; gap: 10px;">
+            <button id="clearAllBtn" class="btn btn-ghost">🗑️ Temizle</button>
+            <button id="convertAllBtn" class="btn btn-primary">🔄 Tümünü Dönüştür</button>
+          </div>
+        </header>
+
+        <div class="scroll-area">
+          <!-- Pending List -->
+          <div id="fileListContainer" style="display: none;">
+            <div class="section-header">
+              <h2 class="section-title">Bekleyen Dosyalar</h2>
+            </div>
+            <div id="fileList" class="file-grid">
+              <!-- Cards here -->
+            </div>
+          </div>
+
+          <!-- Completed List -->
+          <div id="convertedSection" style="display: none;">
+            <div class="section-header">
+              <h2 class="section-title" style="color: var(--success);">Tamamlananlar</h2>
+              <button id="downloadZipBtn" class="btn btn-primary">📦 ZIP Olarak İndir</button>
+            </div>
+            <div id="convertedList" class="file-grid">
+              <!-- Cards here -->
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <!-- Progress Overlay -->
+    <div id="progressContainer" class="process-overlay">
+      <div id="progressText" style="font-size: 0.9rem; font-weight: 700;">İşleniyor...</div>
+      <div class="progress-bar-bg">
+        <div id="progressFill" class="progress-bar-fill"></div>
+      </div>
+    </div>
+
+
+
+
+
+
+    <!-- External Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.11.0/dist/ffmpeg.min.js"></script>
+
+
+    <!-- JavaScript Kodu -->
+    <script>
+      /**
+       * Ana uygulama sınıfı - Dosya dönüştürme ve yönetim merkezi
+       */
+      class FileConverter {
+        constructor() {
+          // DOM Elementleri
+          this.uploadArea = document.getElementById("uploadArea");
+          this.fileInput = document.getElementById("fileInput");
+          this.fileListContainer = document.getElementById("fileListContainer");
+          this.fileList = document.getElementById("fileList");
+          this.convertedSection = document.getElementById("convertedSection");
+          this.convertedList = document.getElementById("convertedList");
+          this.errorMessage = document.getElementById("errorMessage");
+          this.convertAllBtn = document.getElementById("convertAllBtn");
+          this.clearAllBtn = document.getElementById("clearAllBtn");
+          this.downloadZipBtn = document.getElementById("downloadZipBtn");
+          this.globalTargetFormat = document.getElementById("globalTargetFormat");
+          this.imageSettings = document.getElementById("imageSettings");
+          this.progressContainer = document.getElementById("progressContainer");
+          this.progressFill = document.getElementById("progressFill");
+          this.progressText = document.getElementById("progressText");
+
+          // Resim Ayarları
+          this.imgQuality = document.getElementById("imgQuality");
+          this.imgWidth = document.getElementById("imgWidth");
+          this.imgHeight = document.getElementById("imgHeight");
+
+          // Uygulama Durumu
+          this.files = []; 
+          this.isProcessing = false;
+          this.ffmpeg = null;
+
+          // Desteklenen Formatlar
+          this.supportedFormats = {
+            image: ["jpg", "jpeg", "png", "gif", "bmp", "webp", "tiff", "ico"],
+            document: ["txt", "html", "md", "pdf", "csv", "json"],
+            video: ["mp4", "webm", "mov", "avi", "mkv", "flv"],
+            audio: ["mp3", "wav", "ogg", "m4a", "aac", "flac"]
+          };
+
+          this.initEventListeners();
+        }
+
+        initEventListeners() {
+          this.uploadArea.addEventListener("dragover", (e) => {
+            e.preventDefault();
+            this.uploadArea.classList.add("dragover");
+          });
+
+          this.uploadArea.addEventListener("dragleave", () => {
+            this.uploadArea.classList.remove("dragover");
+          });
+
+          this.uploadArea.addEventListener("drop", (e) => {
+            e.preventDefault();
+            this.uploadArea.classList.remove("dragover");
+            this.handleFiles(e.dataTransfer.files);
+          });
+
+          this.uploadArea.addEventListener("click", () => this.fileInput.click());
+
+          this.fileInput.addEventListener("change", (e) => {
+            this.handleFiles(e.target.files);
+            this.fileInput.value = ""; 
+          });
+
+          this.clearAllBtn.addEventListener("click", () => this.clearAll());
+          this.convertAllBtn.addEventListener("click", () => this.convertAll());
+          this.downloadZipBtn.addEventListener("click", () => this.downloadAllAsZip());
+
+          this.globalTargetFormat.addEventListener("change", (e) => {
+            const format = e.target.value;
+            if (format) {
+              this.files.forEach(f => {
+                if (f.status === "ready" && this.canConvertTo(f.file, format)) {
+                  f.targetFormat = format;
+                }
+              });
+              this.updateUI();
+            }
+          });
+        }
+
+        handleFiles(fileList) {
+          const newFiles = Array.from(fileList).map(file => ({
+            id: Math.random().toString(36).substr(2, 9),
+            file: file,
+            targetFormat: "",
+            status: "ready", 
+            convertedBlob: null,
+            progress: 0
+          }));
+
+          this.files = [...this.files, ...newFiles];
+          this.updateUI();
+        }
+
+        canConvertTo(file, targetFormat) {
+          const ext = file.name.split(".").pop().toLowerCase();
+          const category = this.getFileCategory(ext);
+          const targetCategory = this.getFileCategory(targetFormat);
+          
+          if (category === "image" && targetCategory === "image") return true;
+          if (category === "document" && targetCategory === "document") return true;
+          if (category === "image" && targetFormat === "pdf") return true;
+          if (category === "video" && targetCategory === "audio") return true; // Video to Audio
+          if (category === "video" && targetCategory === "video") return true;
+          if (category === "audio" && targetCategory === "audio") return true;
+          
+          return category === targetCategory;
+        }
+
+        getFileCategory(ext) {
+          for (const [cat, formats] of Object.entries(this.supportedFormats)) {
+            if (formats.includes(ext)) return cat;
+          }
+          return null;
+        }
+
+        updateUI() {
+          const pending = this.files.filter(f => f.status !== "completed");
+          const completed = this.files.filter(f => f.status === "completed");
+
+          // Bekleyen Dosyalar
+          if (pending.length > 0) {
+            this.fileListContainer.style.display = "block";
+            this.fileList.innerHTML = "";
+            pending.forEach(f => {
+              const ext = f.file.name.split(".").pop().toLowerCase();
+              const category = this.getFileCategory(ext);
+              const card = document.createElement("div");
+              card.className = "file-card";
+              card.innerHTML = `
+                <div class="file-thumb">${this.getIconForCategory(category)}</div>
+                <div class="file-info">
+                  <div class="file-name" title="${f.file.name}">${f.file.name}</div>
+                  <div class="file-meta">${(f.file.size / 1024 / 1024).toFixed(2)} MB • ${ext.toUpperCase()}</div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <select class="select-format" onchange="window.fileConverter.updateItemFormat('${f.id}', this.value)" ${f.status === 'processing' ? 'disabled' : ''}>
+                    <option value="">Hedef...</option>
+                    ${this.getFormatOptionsFor(category, ext, f.targetFormat)}
+                  </select>
+                  <button class="btn btn-danger" style="padding: 6px 10px;" onclick="window.fileConverter.removeItem('${f.id}')" ${f.status === 'processing' ? 'disabled' : ''}>✕</button>
+                </div>
+              `;
+              this.fileList.appendChild(card);
+            });
+          } else {
+            this.fileListContainer.style.display = "none";
+          }
+
+          // Tamamlananlar
+          if (completed.length > 0) {
+            this.convertedSection.style.display = "block";
+            this.convertedList.innerHTML = "";
+            completed.forEach(f => {
+              const oldSize = f.file.size;
+              const newSize = f.convertedBlob.size;
+              const saving = ((1 - newSize / oldSize) * 100).toFixed(0);
+              
+              const card = document.createElement("div");
+              card.className = "file-card";
+              card.style.borderColor = "var(--success)";
+              card.innerHTML = `
+                <div class="file-thumb" style="color: var(--success);">✅</div>
+                <div class="file-info">
+                  <div class="file-name">${f.file.name.replace(/\.[^/.]+$/, "")}.${f.targetFormat}</div>
+                  <div class="file-meta">
+                    ${(newSize / 1024 / 1024).toFixed(2)} MB 
+                    ${saving > 0 ? `<span style="color: var(--success); font-weight: 700; margin-left: 8px;">↓ %${saving} küçüldü</span>` : ''}
+                  </div>
+                </div>
+                <button class="btn btn-primary" style="padding: 6px 12px;" onclick="window.fileConverter.downloadItem('${f.id}')">📥 İndir</button>
+              `;
+              this.convertedList.appendChild(card);
+            });
+          } else {
+            this.convertedSection.style.display = "none";
+          }
+
+          // Resim Ayarları
+          const hasImages = pending.some(f => this.getFileCategory(f.file.name.split(".").pop().toLowerCase()) === "image");
+          this.imageSettings.style.display = hasImages ? "block" : "none";
+        }
+
+        getIconForCategory(cat) {
+          switch(cat) {
+            case "image": return "🖼️";
+            case "document": return "📄";
+            case "video": return "🎬";
+            case "audio": return "🎵";
+            default: return "📁";
+          }
+        }
+
+        getFormatOptionsFor(cat, currentExt, selected) {
+          let options = "";
+          let formats = [...(this.supportedFormats[cat] || [])];
+          
+          if (cat === "image" && !formats.includes("pdf")) {
+            formats.push("pdf");
+          }
+
+          // Video dosyaları için ses formatlarını da ekle (MP4 -> MP3 gibi)
+          if (cat === "video") {
+            formats = [...formats, ...this.supportedFormats.audio];
+          }
+
+          formats.forEach(fmt => {
+            if (fmt !== currentExt) {
+              options += `<option value="${fmt}" ${selected === fmt ? 'selected' : ''}>${fmt.toUpperCase()}</option>`;
+            }
+          });
+          return options;
+        }
+
+        updateItemFormat(id, format) {
+          const file = this.files.find(f => f.id === id);
+          if (file) file.targetFormat = format;
+        }
+
+        removeItem(id) {
+          this.files = this.files.filter(f => f.id !== id);
+          this.updateUI();
+        }
+
+        clearAll() {
+          if (this.isProcessing) return;
+          this.files = [];
+          this.updateUI();
+          this.hideError();
+        }
+
+        async convertAll() {
+          if (this.isProcessing) return;
+          
+          const pending = this.files.filter(f => f.status === "ready" && f.targetFormat);
+          if (pending.length === 0) {
+            this.showError("Lütfen dosyaları ve hedef formatları seçin.");
+            return;
+          }
+
+          this.isProcessing = true;
+          this.convertAllBtn.disabled = true;
+          this.showProgress("Dosyalar işleniyor...");
+
+          try {
+            for (let i = 0; i < pending.length; i++) {
+              const f = pending[i];
+              f.status = "processing";
+              this.updateUI();
+              this.updateProgress(`Dönüştürülüyor: ${f.file.name}`, (i / pending.length) * 100);
+
+              try {
+                const blob = await this.processFile(f);
+                f.convertedBlob = blob;
+                f.status = "completed";
+              } catch (err) {
+                console.error(err);
+                f.status = "error";
+                this.showError(`${f.file.name} hatası: ${err.message}`);
+              }
+            }
+            this.updateUI();
+            this.updateProgress("Tamamlandı!", 100);
+          } finally {
+            this.isProcessing = false;
+            this.convertAllBtn.disabled = false;
+            setTimeout(() => this.hideProgress(), 2000);
+          }
+        }
+
+        async processFile(fileObj) {
+          const ext = fileObj.file.name.split(".").pop().toLowerCase();
+          const targetFormat = fileObj.targetFormat;
+          const category = this.getFileCategory(ext);
+
+          if (category === "image" && targetFormat !== "pdf") {
+            return await this.compressAndResizeImage(fileObj.file, targetFormat);
+          } else if (targetFormat === "pdf") {
+            return await this.convertToPDF(fileObj.file, ext);
+          } else if (category === "document") {
+            return await this.convertDocument(fileObj.file, ext, targetFormat);
+          } else if (category === "video" || category === "audio") {
+            return await this.processWithFFmpeg(fileObj.file, targetFormat);
+          }
+          throw new Error("Dönüştürme desteklenmiyor");
+        }
+
+        async processWithFFmpeg(file, targetFormat) {
+          if (!window.SharedArrayBuffer) {
+            throw new Error("Güvenlik kısıtlaması: Lütfen sayfayı yenileyin veya farklı bir tarayıcı deneyin. (SharedArrayBuffer eksik)");
+          }
+          
+          if (!this.ffmpeg) {
+            this.ffmpeg = FFmpeg.createFFmpeg({ 
+              log: true,
+              corePath: 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.11.0/dist/ffmpeg-core.js'
+            });
+            this.updateProgress("Kütüphane hazırlanıyor...", 10);
+            await this.ffmpeg.load();
+          }
+
+          const inputName = file.name;
+          const outputName = `output.${targetFormat}`;
+
+          this.ffmpeg.FS('writeFile', inputName, await FFmpeg.fetchFile(file));
+          
+          this.ffmpeg.setProgress(({ ratio }) => {
+            this.updateProgress(`İşleniyor: ${Math.round(ratio * 100)}%`, ratio * 100);
+          });
+
+          await this.ffmpeg.run('-i', inputName, outputName);
+          
+          const data = this.ffmpeg.FS('readFile', outputName);
+          return new Blob([data.buffer], { type: this.getMimeType(targetFormat) });
+        }
+
+        async compressAndResizeImage(file, targetFormat) {
+          return new Promise((resolve, reject) => {
+            const img = new Image();
+            img.onload = () => {
+              const canvas = document.createElement("canvas");
+              const ctx = canvas.getContext("2d");
+              let width = img.width;
+              let height = img.height;
+
+              const tW = parseInt(this.imgWidth.value);
+              const tH = parseInt(this.imgHeight.value);
+
+              if (tW && !tH) { height = (tW / width) * height; width = tW; }
+              else if (!tW && tH) { width = (tH / height) * width; height = tH; }
+              else if (tW && tH) { width = tW; height = tH; }
+
+              canvas.width = width;
+              canvas.height = height;
+              ctx.drawImage(img, 0, 0, width, height);
+
+              const quality = parseInt(this.imgQuality.value) / 100;
+              canvas.toBlob((blob) => {
+                if (blob) resolve(blob);
+                else reject(new Error("Hata oluştu"));
+              }, `image/${targetFormat === 'jpg' ? 'jpeg' : targetFormat}`, quality);
+            };
+            img.src = URL.createObjectURL(file);
+          });
+        }
+
+        async convertToPDF(file, fromExt) {
+          const { jsPDF } = window.jspdf;
+          const doc = new jsPDF();
+          const quality = parseInt(this.imgQuality.value) / 100;
+
+          if (this.getFileCategory(fromExt) === "image") {
+            return new Promise((resolve) => {
+              const img = new Image();
+              img.onload = () => {
+                const imgProps = doc.getImageProperties(img);
+                const pdfWidth = doc.internal.pageSize.getWidth();
+                const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+                
+                // Kalite ayarını burada da uyguluyoruz
+                doc.addImage(img, 'JPEG', 0, 0, pdfWidth, pdfHeight, undefined, 'FAST', 0); // Fast compression
+                resolve(doc.output('blob'));
+              };
+              img.src = URL.createObjectURL(file);
+            });
+          } else {
+            const text = await file.text();
+            doc.text(text, 10, 10);
+            return doc.output('blob');
+          }
+        }
+
+        async convertDocument(file, fromExt, toExt) {
+          const text = await file.text();
+          let content = text;
+          if (toExt === "html") content = `<html><body><pre>${text}</pre></body></html>`;
+          return new Blob([content], { type: this.getMimeType(toExt) });
+        }
+
+        getMimeType(format) {
+          const types = {
+            jpg: "image/jpeg", png: "image/png", webp: "image/webp", 
+            pdf: "application/pdf", txt: "text/plain", html: "text/html",
+            mp4: "video/mp4", webm: "video/webm", avi: "video/x-msvideo",
+            mp3: "audio/mpeg", wav: "audio/wav", ogg: "audio/ogg"
+          };
+          return types[format] || "application/octet-stream";
+        }
+
+        downloadItem(id) {
+          const f = this.files.find(f => f.id === id);
+          if (f && f.convertedBlob) {
+            const url = URL.createObjectURL(f.convertedBlob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `${f.file.name.replace(/\.[^/.]+$/, "")}.${f.targetFormat}`;
+            a.click();
+            URL.revokeObjectURL(url);
+          }
+        }
+
+        async downloadAllAsZip() {
+          const zip = new JSZip();
+          const completed = this.files.filter(f => f.status === "completed");
+          completed.forEach(f => {
+            zip.file(`${f.file.name.replace(/\.[^/.]+$/, "")}.${f.targetFormat}`, f.convertedBlob);
+          });
+          const content = await zip.generateAsync({ type: "blob" });
+          const url = URL.createObjectURL(content);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = "donusturulenler.zip";
+          a.click();
+        }
+
+        showProgress(msg) {
+          this.progressContainer.style.display = "block";
+          this.progressText.textContent = msg;
+          this.progressFill.style.width = "0%";
+        }
+
+        updateProgress(msg, p) {
+          this.progressText.textContent = msg;
+          this.progressFill.style.width = p + "%";
+        }
+
+        hideProgress() {
+          this.progressContainer.style.display = "none";
+        }
+
+        showError(msg) {
+          this.errorMessage.textContent = msg;
+          this.errorMessage.style.display = "block";
+          setTimeout(() => this.hideError(), 5000);
+        }
+
+        hideError() {
+          this.errorMessage.style.display = "none";
+        }
+      }
+
+      window.onload = () => { window.fileConverter = new FileConverter(); };
+    </script>
+  </body>
+</html>
+
