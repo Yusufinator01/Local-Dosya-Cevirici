@@ -1490,9 +1490,10 @@
           let ballCurrentY = initialY;
           let pullDist = 0;
           let pullAngle = 0;
+          let lastClickTime = 0;
 
           const onStart = (e) => {
-            if (ball.classList.contains("flying")) return;
+            if (ball.classList.contains("flying") || ball.classList.contains("scoring")) return;
             e.stopPropagation();
             isPulling = true;
             anchorX = parseFloat(ball.getAttribute("data-anchor-x") || ball.style.left);
@@ -1586,7 +1587,16 @@
               const g = 1400;
               this.runAngryBirdsFlight(ball, file, ballCurrentX, ballCurrentY, vx, vy, g);
             } else {
-              // Küçük hareket -> başlangıç noktasına geri yaylan
+              // Hızlı çift tıklama kontrolü (dokunmatik/farede kaçırmayan tetikleyici)
+              const now = performance.now();
+              if (now - lastClickTime < 380) {
+                lastClickTime = 0;
+                this.autoScoreShot(ball, file);
+                return;
+              }
+              lastClickTime = now;
+
+              // Küçük hareket / tek tıklama -> başlangıç noktasına geri yaylan
               ball.style.transition = "all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)";
               ball.style.left = anchorX + "px";
               ball.style.top = anchorY + "px";
@@ -1601,23 +1611,74 @@
           window.addEventListener("mouseup", onEnd);
           window.addEventListener("touchend", onEnd);
 
-          // Çift tıklamayla otomatik tam isabetli şut
-          ball.addEventListener("dblclick", () => {
-            if (ball.classList.contains("flying")) return;
-            const hoopRect = this.hoopAssembly ? this.hoopAssembly.getBoundingClientRect() : { left: 160, top: 120, width: 68, height: 20 };
-            const hoopX = hoopRect.left + hoopRect.width / 2;
-            const hoopY = hoopRect.top + hoopRect.height / 2;
-            const startX = parseFloat(ball.style.left);
-            const startY = parseFloat(ball.style.top);
-
-            const g = 1400;
-            const T = 0.95;
-            const targetY = hoopY - 14;
-            const autoVx = (hoopX - startX) / T;
-            const autoVy = ((targetY - startY) - 0.5 * g * T * T) / T;
-
-            this.runAngryBirdsFlight(ball, file, startX, startY, autoVx, autoVy, g);
+          // Çift tıklamayla kesin ve doğrudan potaya basket atışı
+          ball.addEventListener("dblclick", (e) => {
+            e.stopPropagation();
+            this.autoScoreShot(ball, file);
           });
+        }
+
+        autoScoreShot(ball, file) {
+          if (!ball || ball.classList.contains("flying") || ball.classList.contains("scoring")) return;
+          ball.classList.remove("pulling", "returning");
+          ball.classList.add("flying", "scoring");
+          ball.style.transition = "none";
+
+          if (this.courtCordLeft && this.courtCordRight) {
+            this.courtCordLeft.setAttribute("opacity", "0");
+            this.courtCordRight.setAttribute("opacity", "0");
+          }
+          const dotsContainer = document.getElementById("courtAimDots");
+          if (dotsContainer) dotsContainer.innerHTML = "";
+
+          const hoopRect = this.hoopAssembly ? this.hoopAssembly.getBoundingClientRect() : { left: 160, top: 120, width: 68, height: 20 };
+          const rimCenterX = hoopRect.left + hoopRect.width / 2;
+          const rimCenterY = hoopRect.top + hoopRect.height / 2;
+
+          const startX = parseFloat(ball.style.left) || rimCenterX + 280;
+          const startY = parseFloat(ball.style.top) || rimCenterY + 180;
+
+          if (this.scoreStatus) {
+            this.scoreStatus.textContent = "TAM İSABET! 🎯";
+            this.scoreStatus.classList.add("swish-alert");
+          }
+
+          const badge = ball.querySelector(".court-ball-badge");
+          if (badge) badge.textContent = "🔥 BASKET!";
+
+          const duration = 650; // ms
+          const startTime = performance.now();
+
+          // Kontrol noktası: Başlangıç ve potanın ortasında, yukarıda tepe noktası (parabolik kavis)
+          const peakX = (startX + rimCenterX) / 2;
+          const peakY = Math.min(startY, rimCenterY) - Math.max(90, Math.abs(startX - rimCenterX) * 0.22);
+
+          const animate = (currentTime) => {
+            const elapsed = currentTime - startTime;
+            const progress = Math.min(elapsed / duration, 1);
+
+            // Kuadratik Bezier eğrisi (Pürüzsüz kavisli basket rotası)
+            const t = progress;
+            const inv = 1 - t;
+            const curX = inv * inv * startX + 2 * inv * t * peakX + t * t * rimCenterX;
+            const curY = inv * inv * startY + 2 * inv * t * peakY + t * t * (rimCenterY + 10);
+
+            ball.style.left = curX + "px";
+            ball.style.top = curY + "px";
+
+            // Potaya yaklaşırken derinlik efekti
+            const scale = 1 - (t * 0.25);
+            ball.style.transform = `translate(-50%, -50%) scale(${scale})`;
+
+            if (progress < 1) {
+              requestAnimationFrame(animate);
+            } else {
+              // %100 kesinlikle çemberin tam merkezine girdi!
+              this.onBallScore(ball, file);
+            }
+          };
+
+          requestAnimationFrame(animate);
         }
 
         runAngryBirdsFlight(ball, file, startX, startY, initVx, initVy, g) {
